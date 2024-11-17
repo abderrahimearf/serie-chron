@@ -1,0 +1,575 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+
+---
+title: "`r '<span style=\"color:red; font-size: 36px; text-align:center;\">MINI PROJET SERIE CHRONOLOGIQUE</span>'`"<br><br>
+author: "`r '<span style=\"color:blue;\">ARFAOUI, BZIZ, ABBAD</span>'`"
+date: "2024-10-25"<br>
+output:
+  html_document: default
+  word_document: default
+---
+
+
+
+<br>
+<br>
+## PLAN:
+
+# Importer les packages
+
+```{r , echo=TRUE,eval="FALSE",message = FALSE,warning = FALSE,fig.show='hold' }
+library(FinTS) 
+library(TSstudio)
+library(tseries)
+library(forecast)
+library(rugarch)
+library(lmtest)
+library(dplyr)
+library(readxl)
+library(tidyquant)
+library(rugarch)
+```
+
+## Télécharger les données boursières de Apple (AAPL) entre 2000 et 2024
+La formule du rendement simple est la suivante :
+
+$$
+R = \frac{P_t - P_{t-1}}{P_{t-1}}
+$$
+
+Où :
+
+- \( R \) est le rendement simple.
+- \( P_t \) est l'indice boursière de Apple  à la période \( t \).
+- \( P_{t-1} \) est l'indice boursière de Apple à la période précédente \( t-1 \).
+
+Le rendement logarithmique est donné par la formule suivante :
+
+$$
+R_t = \ln(p_t) - \ln(p_{t-1}) = \ln\left(\frac{p_t}{p_{t-1}}\right)
+$$
+
+Où :
+
+- \( p_t \) est l'indice boursière de Apple à la période \( t \),
+- \( p_{t-1} \) est l'indice boursière de Apple observé à la période \( t-1 \),
+- \( R_t \) est le rendement quotidien  \( t \).
+
+
+
+```{r , echo=TRUE,eval="FALSE",message = FALSE,warning = FALSE,fig.show='hold' }
+BTC <- tq_get("TSLA", from = "2000-01-01", to = "2024-01-01")
+head(BTC)
+log_return <- diff(log(BTC$close))
+data=ts(BTC$close, start = c(2000, 1), end = c(2024, 1), frequency = 365)
+
+ts_plot(data)
+r=ts(log_return)
+
+ts_plot(r)
+
+```
+
+## Préparation des données
+### Test de stationnarité : KPSS et Dickey-Fuller
+
+#### 1. Test KPSS :
+Le test **KPSS** vérifie si la série temporelle est stationnaire autour d'une tendance. <br>
+- **Hypothèse nulle (H0)** : La série est stationnaire.<br>
+- **Hypothèse alternative (H1)** : La série n'est pas stationnaire.<br>
+
+#### 2. Test Dickey-Fuller (ADF) :
+Le test **Dickey-Fuller** vérifie si la série présente une racine unitaire et n'est donc pas stationnaire.<br>
+- **Hypothèse nulle (H0)** : La série n'est pas stationnaire (présente une racine unitaire).<br>
+- **Hypothèse alternative (H1)** : La série est stationnaire.<br>
+
+## Résultats
+ les graphiques ACF (Auto-Correlation Function) et PACF (Partial Auto-Correlation Function) montrent que les autocorrélations à des lags élevés sont faibles ou proches de zéro, cela signifie qu'il n'y a pas de dépendances significatives dans les valeurs passées. Dans ce cas, les ordres p (Auto-Régressif) et q (Moyenne Mobile) peuvent être égaux à zéro. Cela indique que la série peut être traitée avec un modèle plus simple, comme une marche aléatoire.<br>
+** ausii les deux testes indiquenet que le série est stationnaire**
+ 
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+acf(r,lag.max = 20)
+pacf(r,lag.max = 20)
+adf.test(r,k=2)
+kpss.test(r)
+
+```
+
+## Tester l'autocorrélation(Ljung-Box,est ARCH)
+### 1. Test de Ljung-Box (pour tester l'autocorrélation des résidus)
+
+Le test de Ljung-Box est utilisé pour tester si les autocorrélations des résidus sont significatives à différents lags. Si le test échoue, cela signifie que les résidus présentent une autocorrélation non capturée par le modèle.<br>
+
+**Hypothèses** :<br>
+- **H0** : Il n'y a pas d'autocorrélation dans les résidus à l'ordre des lags spécifiés.<br>
+- **H1** : Il y a une autocorrélation significative dans les résidus.<br>
+
+### 2. Test ARCH (pour tester l'effet de l'hétéroscédasticité dans les résidus)
+
+Le test ARCH est utilisé pour tester l'effet de l'hétéroscédasticité, c'est-à-dire la présence de variances conditionnelles non constantes dans les résidus. Si le test échoue, cela suggère qu'il existe une hétéroscédasticité non capturée par le modèle.<br>
+
+**Hypothèses** :<br>
+- **H0** : Il n'y a pas d'effet ARCH dans les résidus (les résidus sont homoscédastiques).<br>
+- **H1** : Il y a un effet ARCH dans les résidus (les résidus sont hétéroscédastiques).<br>
+
+## Résultat
+
+
+**Pour r (p-value = 4.457e-05) :**<br>
+
+Interprétation : La p-value est inférieure à 0.05, donc nous  rejetons  l'hypothèse nulle \( H_0 \) (pas d'autocorrélation dans les résidus).<br>
+
+
+  
+
+
+
+
+### la série est pas un BB   
+
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+Box.test(r,type="Ljung-Box",lag=10)
+
+```
+### on essaye de rendre la série un bruit blanc avec un modéle arma7
+
+### arma(2,0,2)
+
+### les coeificients sont sénifactivement differnt de 0
+
+### le résidus de modéle est un BB 
+
+
+
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+modelar=auto.arima(r)
+print(modelar)
+resid=modelar$residuals
+Box.test(resid,lag=10)
+
+```
+## Tester l'autocorrélation(Ljung-Box,est ARCH)
+### 1. Test de Ljung-Box (pour tester l'autocorrélation des résidus)
+
+Le test de Ljung-Box est utilisé pour tester si les autocorrélations des résidus sont significatives à différents lags. Si le test échoue, cela signifie que les résidus présentent une autocorrélation non capturée par le modèle.<br>
+
+**Hypothèses** :<br>
+- **H0** : Il n'y a pas d'autocorrélation dans les résidus à l'ordre des lags spécifiés.<br>
+- **H1** : Il y a une autocorrélation significative dans les résidus.<br>
+
+### 2. Test ARCH (pour tester l'effet de l'hétéroscédasticité dans les résidus)
+
+Le test ARCH est utilisé pour tester l'effet de l'hétéroscédasticité, c'est-à-dire la présence de variances conditionnelles non constantes dans les résidus. Si le test échoue, cela suggère qu'il existe une hétéroscédasticité non capturée par le modèle.<br>
+
+**Hypothèses** :<br>
+- **H0** : Il n'y a pas d'effet ARCH dans les résidus (les résidus sont homoscédastiques).<br>
+- **H1** : Il y a un effet ARCH dans les résidus (les résidus sont hétéroscédastiques).<br>
+
+## Résultat
+
+
+**Pour r (p-value = 0.1134) :**<br>
+
+Interprétation : La p-value est supérieure à 0.05, donc nous ne rejetons pas l'hypothèse nulle \( H_0 \) (pas d'autocorrélation dans les résidus). Cela suggère qu'il n'y a pas d'autocorrélation significative .<br>
+
+**Pour r^2 ( p-value = 0.01343) :**<br>
+
+Interprétation : La p-value est inférieure à 0.05. Il y a des autocorrélation significative .<br>
+
+
+
+**ARCH LM Test (p-value = 0.007052)**: <br>
+Interprétation : La p-value est inférieure à 0.05, ce qui signifie que l'hypothèse nulle 
+  (pas d'effets ARCH) est rejetée.<br>
+  
+  **la série est BB mais i y a effet ARCH**
+  
+### la série est pas un BB   p
+
+### effet de ARch sur la série
+
+###  des autocorélations des rendement au carée   
+
+### on peut intérpreter ce résultat par la dépancence de l'anné suivente au anné actuele
+
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+Box.test(resid,type="Ljung-Box",lag=10)
+acf(resid^2)
+pacf(resid^2)
+Box.test(resid^2,type="Ljung-Box",lag=10)
+ArchTest(resid)
+ArchTest(resid,lag=1)
+
+```
+## Modélisation
+
+### Modèle GARCH
+
+Le modèle GARCH (Generalized Autoregressive Conditional Heteroskedasticity) est utilisé pour modéliser les séries temporelles avec volatilité conditionnelle. Il capture les effets de la variance qui évolue dans le temps, en prenant en compte les chocs passés et les variances passées pour estimer la volatilité future.
+
+La formulation générale du modèle GARCH(p, q) est :
+
+$$ r_t = \mu + \epsilon_t $$  
+$$ \epsilon_t = \sigma_t z_t $$  
+$$ \sigma_t^2 = \alpha_0 + \sum_{i=1}^{q} \alpha_i \epsilon_{t-i}^2 + \sum_{j=1}^{p} \beta_j \sigma_{t-j}^2 $$
+
+Où :
+- \( r_t \) : Rendement à l'instant \( t \)<br>
+- \( \mu \) : Moyenne des rendements<br>
+- \( \epsilon_t \) : Choc ou résidu à l'instant \( t \)<br>
+- \( \sigma_t^2 \) : Variance conditionnelle (volatilité estimée à l'instant \( t \))<br>
+- \( \alpha_0 \) : Paramètre constant<br>
+- \( \alpha_i \) : Paramètres des erreurs passées (résidus)<br>
+- \( \beta_j \) : Paramètres des variances passées<br>
+- \( z_t \) : Erreur aléatoire (bruit blanc)<br>
+
+Les modèles GARCH sont largement utilisés en finance pour analyser les séries de rendements financiers, car ils modélisent bien la volatilité qui varie dans le temps, ainsi que l'effet de clustering de volatilité.<br>
+
+
+## Résultat
+
+### les trois coeificient sont sinificativement différent de 0
+
+### les résidus ne sont pas des bruit balnc selon Ljung-Box Test
+
+### les résidus au carrée sont  des bruit balnc selon Ljung-Box Test
+
+###  no effet de arch selon ARCH LM Tests
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+spec=ugarchspec(
+  mean.model=list(armaOrder=c(2,2),include.mean=F),
+  variance.model=list(model="sGARCH",garchOrder=c(1,1)),
+  distribution.model="norm")
+model=ugarchfit(spec=spec,data=r)
+print(model)
+
+```
+## prévision avec modéle GARCH(1,1)
+ le modèle est trop simple ( GARCH(1, 1)), il peut sous-estimer les fluctuations dans les rendements et ne pas saisir correctement la dynamique à court terme.  une prévision  semble se stabiliser rapidement.
+ 
+
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+h=10
+fr=ugarchforecast(model,n.head=h)
+plot(fr ,which=1)  
+plot(fr ,which=3)
+sigma_t=fr@forecast$sigmaFor
+plot(sigma_t,type="l",col="blue",main="s")
+
+```
+## Modélisation avec une autre modéle GARCH
+** alpha1 ,beta1 et omega du modéle GARCH(1,1) sont sinéficativement différent de 0** 
+ **  pour cele on va augmenter la complexité du modéle**
+ 
+## les paramétres optimaux sont différent de 0 
+
+### les résidus sont  des bruit balnc à partir lag=5 selon Ljung-Box Test
+
+### les résidus au carrée sont  des bruit balnc  selon Ljung-Box Test
+
+###  no effet de arch selon ARCH LM Tests
+ 
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+spec1=ugarchspec(
+  mean.model=list(armaOrder=c(2,2),include.mean=F),
+  variance.model=list(model="sGARCH",garchOrder=c(1,2)),
+  distribution.model="norm")
+model1=ugarchfit(spec=spec1,data=r)
+print(model1)
+
+```
+## prévision avec modéle GARCH(1,2)
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+h=10
+fr=ugarchforecast(model1,n.head=h)
+plot(fr ,which=1)  
+plot(fr ,which=3)
+sigma_t=fr@forecast$sigmaFor
+plot(sigma_t,type="l",col="blue",main="s")
+
+```
+### Modèle EGARCH (Exponential GARCH)
+
+Le modèle **EGARCH** (Exponential Generalized Autoregressive Conditional Heteroskedasticity) est une extension du modèle GARCH classique. Contrairement au GARCH, l'EGARCH peut capturer des effets asymétriques dans la volatilité, ce qui signifie qu'il peut modéliser des chocs négatifs et positifs sur la volatilité de manière différente. Il est souvent utilisé pour les séries temporelles financières où les retours négatifs augmentent souvent plus la volatilité que les retours positifs de même taille.
+
+La formulation générale du modèle **EGARCH(p, q)** est la suivante :
+
+$$ r_t = \mu + \epsilon_t $$  
+$$ \epsilon_t = \sigma_t z_t $$  
+$$ \log(\sigma_t^2) = \alpha_0 + \sum_{i=1}^{q} \alpha_i \frac{\epsilon_{t-i}}{\sigma_{t-i}} + \sum_{j=1}^{p} \beta_j \log(\sigma_{t-j}^2) $$
+
+Où :
+- \( r_t \) : Rendement à l'instant \( t \)  
+- \( \mu \) : Moyenne des rendements  
+- \( \epsilon_t \) : Choc ou résidu à l'instant \( t \)  
+- \( \sigma_t^2 \) : Variance conditionnelle (volatilité estimée à l'instant \( t \))  
+- \( \alpha_0 \) : Paramètre constant  
+- \( \alpha_i \) : Paramètres des résidus passés (les chocs)  
+- \( \beta_j \) : Paramètres des volatilités passées  
+
+### Caractéristiques du modèle EGARCH :
+1. **Asymétrie** : L'EGARCH est conçu pour capturer l'asymétrie dans la volatilité, c'est-à-dire, comment les chocs négatifs affectent la volatilité de manière plus importante que les chocs positifs. Cela est particulièrement utile dans les séries financières où les rendements négatifs (pannes de marché) provoquent souvent plus d'instabilité que les rendements positifs.
+2. **Volatilité exponentielle** : Contrairement au modèle GARCH, où la volatilité est modélisée directement, l'EGARCH modélise la **logarithme** de la volatilité, ce qui permet une meilleure gestion des valeurs négatives de la volatilité et empêche la variance estimée d'être négative.
+3. **Modélisation de la mémoire longue** : En utilisant les logarithmes et les chocs normalisés (\( \epsilon_t/\sigma_t \)), l'EGARCH peut mieux capturer les effets de longue mémoire dans la volatilité, c'est-à-dire la manière dont des événements passés affectent encore la volatilité plusieurs périodes après.
+4. **Stabilité et flexibilité** : Le modèle EGARCH est plus flexible que le modèle GARCH classique, et il peut être plus stable dans certains cas en termes d'estimation et de prévisions de volatilité.
+
+** beta 1 et gamma 1 est sinificaivement  different de 0**
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+spec3=ugarchspec(
+  mean.model=list(armaOrder=c(2,2),include.mean=FALSE),
+  variance.model=list(model="eGARCH",garchOrder=c(1,1)),
+  distribution.model="norm")
+
+model3=ugarchfit(spec=spec3,data=r)
+print(model3)
+```
+## prévision avec modéle E-GARCH(1,1)
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+h=10
+fr=ugarchforecast(model3,n.head=h)
+plot(fr ,which=1)  
+plot(fr ,which=3)
+sigma_t=fr@forecast$sigmaFor
+plot(sigma_t,type="l",col="blue",main="s")
+
+```
+## Modélisation avec une autre modéle E-GARCH
+** alpha1 ,beta1 et omega du modéle GARCH(1,1) sont sinéficativement différent de 0** 
+ **  pour cele on va augmenter la complexité du modéle**
+ 
+## les paramétres optimaux sont différent de 0 
+
+### les résidus sont  des bruit balnc à partir lag=5 selon Ljung-Box Test
+
+### les résidus au carrée sont  des bruit balnc  selon Ljung-Box Test
+
+###  no effet de arch selon ARCH LM Tests
+ 
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+spec4=ugarchspec(
+  mean.model=list(armaOrder=c(2,2),include.mean=F),
+  variance.model=list(model="eGARCH",garchOrder=c(1,2)),
+  distribution.model="norm")
+model4=ugarchfit(spec=spec4,data=r)
+print(model4)
+
+```
+
+
+## prévision avec modéle E-GARCH(1,2)
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+h=10
+fr=ugarchforecast(model4,n.head=h)
+plot(fr ,which=1)  
+plot(fr ,which=3)
+sigma_t=fr@forecast$sigmaFor
+plot(sigma_t,type="l",col="blue",main="s")
+
+```
+
+
+## Comparison des deux modéle par var 
+
+   
+
+
+La VaR est estimée en utilisant les prévisions de volatilité des modèles GARCH(1,1) et EGARCH(1,1), comme suit :
+
+\[
+\text{VaR}_{t+1} = \hat{\sigma}_{t+1} \times Z_{\alpha \text{VaR}}
+\]
+
+Où :
+- \(\hat{\sigma}_{t+1}\) est la volatilité estimée à \(t+1\)
+- \(Z_{\alpha \text{VaR}}\) est le quantile inverse de la distribution normale pour le niveau de confiance \(\alpha \text{VaR}\).
+
+## Calcul des critères de performance :
+
+### Ratio de violation (VR) :
+Ce critère mesure le pourcentage de pertes réelles qui dépassent la VaR estimée. Une violation se produit si le rendement réel \(r_t\) est inférieur à la VaR estimée (\(r_t < \text{VaR}_t\)). Le VR est calculé comme suit :
+
+\[
+VR = \frac{\sum_{t=1}^{T} \delta_t}{T}
+\]
+
+Où :
+- \(\delta_t = 1\) si \(r_t < \text{VaR}_t\) et \(\delta_t = 0\) sinon.
+
+La valeur attendue de VR est \(\alpha \text{VaR}\), donc un VR beaucoup plus bas ou plus élevé que \(\alpha \text{VaR}\) indique que la VaR est sous-estimée ou surestimée.
+
+### Fonction de magnitude carrée moyenne (ASMF) :
+Cette fonction mesure la gravité des exceptions (lorsque la perte réelle dépasse la VaR). Elle est calculée par :
+
+\[
+\text{ASMF} = \frac{1}{\theta} \sum_{t=1}^{T} \xi_t
+\]
+
+Où :
+- \(\xi_t = (r_t - \text{VaR}_t)^2\) lorsque \(r_t < \text{VaR}_t\)
+- \(\xi_t = 0\) lorsque \(r_t \geq \text{VaR}_t\).
+
+Cette fonction permet de distinguer les modèles qui ont des taux de violation similaires, mais des magnitudes différentes.
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+h=10
+fr4=ugarchforecast(model4,n.head=h)
+fr=ugarchforecast(model1,n.head=h)
+sigma_forecast1 <- fr4@forecast$sigmaFor
+length(sigma_forecast1)
+sigma_forecast <- fr@forecast$sigmaFor
+main=fr@forecast$seriesFor
+main1=fr4@forecast$seriesFor
+z_value_95 <- qnorm(0.005)  
+VaR_garch <- main+z_value_95 * sigma_forecast  
+VaR_egarch <-main1+ z_value_95 * sigma_forecast1  
+tesla <- tq_get("TSLA", from = "2024-02-02", to = "2024-9-24")
+tesla <- ts(diff(log(tesla$close)))
+length(tesla)
+plot(VaR_garch, type = "l", col = "red", 
+     main = "VaR GARCH ",
+     xlab = "Priode", ylab = "VaR", lwd = 2)
+
+plot(VaR_egarch, type = "l", col = "red", 
+     main = " EGARCH",
+     xlab = "Priode", ylab = "VaR", lwd = 2)
+
+
+
+
+
+```
+## Prévisions glissantes de VaR
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+n_test <- length(tesla)
+h <- 160
+rolling_forecast <- numeric()
+
+for (start in seq(1, n_test - h + 1, by = h)) {
+  data_segment <- tesla[start:(start + h - 1)]
+  garch_forecast_test <- ugarchforecast(model4, n.ahead = h, data = data_segment)
+  rolling_forecast <- c(rolling_forecast, garch_forecast_test@forecast$sigmaFor)
+}
+
+rolling_forecast1 <- numeric()
+
+for (start in seq(1, n_test - h + 1, by = h)) {
+  data_segment <- tesla[start:(start + h - 1)]
+  garch_forecast_test <- ugarchforecast(model1, n.ahead = h, data = data_segment)
+  rolling_forecast1 <- c(rolling_forecast1, garch_forecast_test@forecast$sigmaFor)
+}
+
+z_value_95 <- qnorm(0.05)  
+VaR_rolling <- -z_value_95 * rolling_forecast
+VaR_rolling1 <- -z_value_95 * rolling_forecast1
+
+plot(tesla, type = "l", col = "blue", lwd = 2,
+     main = "Comparaison des Données Réelles et des VaR Rolling",
+     xlab = "Temps", ylab = "Valeurs")
+lines(VaR_rolling, col = "red", lwd = 2)
+lines(VaR_rolling1, col = "green", lwd = 2)
+legend("topright", legend = c("Données Réelles", "VaR de egarch", "VaR de garch"),
+       col = c("blue", "red", "green"), lty = 1, lwd = 2)
+
+```
+## Test de Kupiec (Proportion of Failures Test) : Évalue si le taux de violation observé est conforme au niveau de confiance attendu.
+
+## Test de Christoffersen (Indépendance des violations) : Vérifie si les violations sont indépendantes dans le temps.
+
+Les résultats des tests de Kupiec pour les deux modèles montrent que les hypothèses nulles sont rejetées dans les deux cas. Le nombre d'excédents réels  est bien supérieur aux excédents attendus (8), ce qui suggère que les modèles sous-estiment la volatilité et la VaR à 95%. Les tests de couverture inconditionnelle (uc) et de couverture correcte avec indépendance (cc) montrent également des statistiques de test bien plus élevées que les valeurs critiques, entraînant le rejet de l'hypothèse nulle. Cela indique que les prévisions de VaR des deux modèles ne sont pas fiables pour capturer correctement les dépassements dans les données de test. En résumé, ces modèles nécessitent des améliorations pour mieux estimer la VaR et pour mieux refléter la réalité des excédents de pertes.
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+
+realized <- tesla[7:166]
+length(realized)
+
+kupiec_rolling <- VaRTest(alpha = 0.05, actual = tesla, VaR = VaR_rolling)
+print(kupiec_rolling)
+
+kupiec_rolling1 <- VaRTest(alpha = 0.05, actual = tesla, VaR = VaR_rolling1)
+print(kupiec_rolling1)
+
+```
+# Comparez les prévisions des deux modèles en utilisant une métrique telle que la Mean Squared Error (MSE) et l'indicateur de    violation pondérée.
+
+## Formule mathématique de l'indicateur de violation pondérée (WVR)
+
+La formule de l'indicateur de violation pondérée (WVR) est définie comme suit :
+
+\[
+\text{WVR} = \frac{1}{N} \sum_{t=1}^{N} \frac{\max(0, L_t - \text{VaR}_t)}{\text{VaR}_t}
+\]
+
+### Variables :
+- \(N\) : Nombre total d'observations dans les données (\texttt{apple\_data\_test1}).
+- \(L_t\) : La perte réalisée ou valeur réelle à l'instant \(t\) (par exemple, \texttt{apple\_data\_test1[t]}).
+- \(\text{VaR}_t\) : La VaR estimée par le modèle à l'instant \(t\) (par exemple, \texttt{VaR\_rolling[t]}).
+- \(\max(0, L_t - \text{VaR}_t)\) : La violation uniquement si \(L_t > \text{VaR}_t\), sinon 0.
+- \(\frac{\max(0, L_t - \text{VaR}_t)}{\text{VaR}_t}\) : La violation pondérée par la VaR.
+
+Cette formule permet de mesurer l'intensité relative des violations par rapport à la VaR prédite.
+
+
+
+```{r , echo=TRUE,eval="TRUE",message = FALSE,warning = FALSE,fig.show='hold' }
+
+mse_rolling <- mean((tesla - VaR_rolling)^2)#E-GARCH
+mse_rolling1 <- mean((tesla - VaR_rolling1)^2)#GARCH
+
+cat("MSE pour E-garch :", mse_rolling, "\n")
+cat("MSE pour garch  :", mse_rolling1, "\n")
+
+
+violations <- tesla - VaR_rolling
+violations <- violations[violations > 0]
+
+severity <- violations
+
+weighted_violations <- sum(severity / VaR_rolling[violations > 0])
+
+WVR <- weighted_violations / length(tesla)
+print(WVR)#E-garch
+
+violations2 <- tesla - VaR_rolling1
+violations2 <- violations2[violations2 > 0]
+
+severity2 <- violations2
+
+weighted_violations2 <- sum(severity2 / VaR_rolling1[violations2 > 0])
+
+WVR2 <- weighted_violations2 / length(tesla)
+print(WVR2)#garche
+
+```
+### Interprétation des résultats
+
+1. **Précision des modèles (MSE)** :  
+   - **E-GARCH** : \( \text{MSE} = 0.005166632   \)  
+   - **GARCH** : \( \text{MSE} =  0.003926482 \)  
+
+   GARCH affiche un MSE légèrement inférieur à celui du E-GARCH, ce qui indique que GARCH est légèrement plus précis dans ses prévisions.
+
+2. **Violations pondérées (WVR)** :  
+   - **E-GARCH** : \( \text{WVR} = 0.4645011 \)  
+   - **GARCH** : \( \text{WVR} = 0.5112099 \)  
+
+   L'indicateur WVR montre que les violations des prévisions du modèle GARCH sont plus importantes en moyenne par rapport à celles du E-GARCH, bien que la différence reste faible.
+
+## E-GARCH semble être un meilleur modèle pour prédire la VaR avec moins de violations importantes que le modèle GARCH
+
+Le E-GARCH (Exponential GARCH), capture  l'asymétrie, c'est-à-dire que les chocs négatifs peuvent entraîner une volatilité plus élevée que les chocs positifs. Cela peut rendre le modèle E-GARCH plus flexible pour capturer les comportements du marché, en particulier dans des conditions extrêmes .
+---
+
+
+
